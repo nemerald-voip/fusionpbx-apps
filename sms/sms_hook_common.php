@@ -35,7 +35,7 @@ include "app/sms/sms_email.php";
 
 //luarun /var/www/html/app/sms/sms.lua TO FROM 'BODY'
 
-$debug = true;
+$debug = false;
 
 require_once "resources/require.php";
 
@@ -149,7 +149,7 @@ function route_and_send_sms($from, $to, $body, $media = "") {
 				require_once "resources/classes/domains.php";
 				$domain = new domains();
 				$domain->set();
-				
+
 				if ($debug) {
 					error_log("Email from: ". $_SESSION['email']['smtp_from']['text']);
 				}
