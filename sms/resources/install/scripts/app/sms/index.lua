@@ -30,7 +30,7 @@
 
 --debug
 	debug["info"] = true;
-	debug["sql"] = true;
+	--debug["sql"] = true;
 
 --set the api
 	api = freeswitch.API();
@@ -85,12 +85,12 @@
 --get the argv values
 	script_name = argv[0];
 	direction = argv[2];
-	
+
 	if (debug["info"]) then
 		freeswitch.consoleLog("notice", "[sms] DIRECTION: " .. direction .. "\n");
 		freeswitch.consoleLog("info", "chat console\n");
 	end
-	
+
 	if direction == "inbound" then
 		to = argv[3];
 		from = argv[4];
@@ -103,7 +103,7 @@
 		end
 		savebody = body;
 		body = body:gsub('<br>','\n');
-		
+
 		if (debug["info"]) then
 			freeswitch.consoleLog("notice", "[sms] TO: " .. to .. "\n");
 			freeswitch.consoleLog("notice", "[sms] Extension: " .. extension .. "\n");
@@ -115,7 +115,7 @@
 			else
 				freeswitch.consoleLog("notice", "[sms] MAILSENT (already): " .. mailsent .. "\n");
 			end
-				
+
 		end
 
 		--See if target ext is registered.
@@ -151,7 +151,7 @@
 		to = extension;
 
 		if (not mailsent == 1) then
-			--Send inbound SMS via email delivery 
+			--Send inbound SMS via email delivery
 			-- This is legacy code retained for backwards compatibility.  See /var/www/fusionpbx/app/sms/sms_email.php for current.
 			if (domain_uuid == nil) then
 				--get the domain_uuid using the domain name required for multi-tenant
@@ -207,7 +207,7 @@
 							emailbody
 							);
 				end
-			end 
+			end
 		end
 
 	elseif direction == "outbound" then
@@ -215,7 +215,7 @@
 			to_user = argv[3];
 			to_user = to_user:gsub("^+?sip%%3A%%40","");
 			to = string.match(to_user,'%d+');
-		else 
+		else
 			to = message:getHeader("to_user");
 			to = to:gsub("^+?sip%%3A%%40","");
 		end
@@ -229,7 +229,7 @@
 			extension = string.match(from,'%d+');
 			if extension:len() > 7 then
 				outbound_caller_id_number = extension;
-			end 
+			end
 		else
 			from = message:getHeader("from_user");
 		end
@@ -269,7 +269,7 @@
 			freeswitch.consoleLog("notice", "[sms] BODY: " .. body .. "\n");
 			freeswitch.consoleLog("notice", "[sms] DOMAIN_NAME: " .. domain_name .. "\n");
 		end
-		
+
 		if (domain_uuid == nil) then
 			--get the domain_uuid using the domain name required for multi-tenant
 				if (domain_name ~= nil) then
@@ -286,7 +286,6 @@
 				end
 		end
 		freeswitch.consoleLog("notice", "[sms] DOMAIN_UUID: " .. domain_uuid .. "\n");
-
 		if (outbound_caller_id_number == nil) then
 			--get the outbound_caller_id_number using the domain_uuid and the extension number
 				if (domain_uuid ~= nil) then
@@ -306,6 +305,8 @@
 						extension_uuid = rows["extension_uuid"];
 						carrier = rows["carrier"];
 					end);
+					freeswitch.consoleLog("notice", "[sms] CARRIER: " .. carrier .. "\n");
+					freeswitch.consoleLog("notice", "[sms] CALLER ID: " .. outbound_caller_id_number .. "\n");
 				end
 		elseif (outbound_caller_id_number ~= nil) then
 			--get the outbound_caller_id_number using the domain_uuid and the extension number
@@ -325,10 +326,11 @@
 					end);
 				end
 		end
-		
-		--get settings 
+
+		--get settings
 		require "resources.functions.settings";
 		settings = settings(domain_uuid);
+
 		if (settings['sms'] ~= nil) then
 			if (settings['sms'][carrier..'_access_key'] ~= nil) then
 				if (settings['sms'][carrier..'_access_key']['text'] ~= nil) then
@@ -363,8 +365,8 @@
 			if (username ~= nil) then freeswitch.consoleLog("notice", "[sms] username: " .. username .. "\n") end;
 			if (delivery_status_webhook_url ~= nil) then freeswitch.consoleLog("notice", "[sms] delivery_status_webhook_url: " .. delivery_status_webhook_url .. "\n") end;
 		end
-		
-			
+
+
 
 		--Check for xml content or delivery status notification type
 		smstempst, smstempend = string.find(body, '<%?xml');
@@ -375,11 +377,17 @@
 			msgtype = message:getHeader("type");
 		end;
 		if (msgtype ~= nil and string.find(msgtype, "imdn") ~= nil) then mdn = true end;
-		if (not mdn) then 
+		if (not mdn) then
 			-- No XML content, continue processing
 			if (carrier == "flowroute") then
 				cmd = "curl -u ".. access_key ..":" .. secret_key .. " -H \"Content-Type: application/json\" -X POST -d '{\"to\":\"" .. to .. "\",\"from\":\"" .. outbound_caller_id_number .."\",\"body\":\"" .. body .. "\"}' " .. api_url;
-			elseif (carrier == "peerless") then	
+			elseif (carrier == "peerless") then
+                                if to:len() < 11 then
+                                        to = "1" .. to;
+                                end
+                                if outbound_caller_id_number:len() < 11 then
+                                        outbound_caller_id_number = "1" .. outbound_caller_id_number;
+                                end
 				cmd = "curl -u" .. access_key .. ":" .. secret_key .. " -ki  https://mms1.pnwireless.net:443/partners/messageReceiving/".. access_key .."/submitMessage -H \"Content-Type: application/json\" -X POST -d '{\"from\":\"" .. outbound_caller_id_number .."\",\"recipients\":[\"+".. to .."\"],\"text\":\"" .. body .. "\"}'";
 			elseif (carrier == "twilio") then
 				if to:len() < 11 then
@@ -405,7 +413,7 @@
 				if outbound_caller_id_number:len() < 11 then
 					outbound_caller_id_number = "1" .. outbound_caller_id_number;
 				end
-				cmd="curl -v -X POST " .. api_url .." -u " .. access_key .. ":" .. secret_key .. " -H \"Content-type: application/json\" -d '{\"from\": \"+" .. outbound_caller_id_number .. "\", \"to\": \"+" .. to .."\", \"text\": \"" .. body .."\"}'"		
+				cmd="curl -v -X POST " .. api_url .." -u " .. access_key .. ":" .. secret_key .. " -H \"Content-type: application/json\" -d '{\"from\": \"+" .. outbound_caller_id_number .. "\", \"to\": \"+" .. to .."\", \"text\": \"" .. body .."\"}'"
 			elseif (carrier == "thinq") then
 				if to:len() < 11 then
 					to = "1" .. to;
@@ -435,10 +443,10 @@
 		else
 			-- XML content
 			freeswitch.consoleLog("notice", "[sms] Body contains XML content and/or is message delivery notification, not sending\n");
-		end	
+		end
 --		os.execute(cmd)
 	end
-	
+
 --write message to the database
 	if (domain_uuid == nil) then
 		--get the domain_uuid using the domain name required for multi-tenant
